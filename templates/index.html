@@ -1,0 +1,2470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    >
+
+    <title>3D House Viewer</title>
+
+    <!-- =========================================================
+         THREE.JS IMPORT MAP
+    ========================================================== -->
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <style>
+
+        /* =====================================================
+           RESET
+        ====================================================== */
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+
+            background: #000;
+
+            font-family:
+                Arial,
+                Helvetica,
+                sans-serif;
+
+            touch-action: none;
+        }
+
+        #container {
+            position: fixed;
+
+            inset: 0;
+
+            width: 100%;
+            height: 100%;
+
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+
+            width: 100%;
+            height: 100%;
+        }
+
+
+        /* =====================================================
+           LOADING SCREEN
+        ====================================================== */
+
+        #loadingScreen {
+
+            position: fixed;
+
+            inset: 0;
+
+            z-index: 1000;
+
+            display: flex;
+
+            align-items: center;
+            justify-content: center;
+
+            background:
+                radial-gradient(
+                    circle at center,
+                    #172554 0%,
+                    #020617 70%
+                );
+
+            color: white;
+        }
+
+        #loadingBox {
+
+            width: min(90%, 420px);
+
+            text-align: center;
+
+            padding: 25px;
+        }
+
+        #loadingTitle {
+
+            font-size: 26px;
+
+            font-weight: 700;
+
+            margin-bottom: 20px;
+        }
+
+        #progressContainer {
+
+            width: 100%;
+
+            height: 8px;
+
+            background:
+                rgba(255,255,255,0.15);
+
+            border-radius: 20px;
+
+            overflow: hidden;
+        }
+
+        #progressBar {
+
+            width: 0%;
+
+            height: 100%;
+
+            background: #38bdf8;
+
+            border-radius: 20px;
+
+            transition:
+                width 0.2s ease;
+        }
+
+        #loadingText {
+
+            margin-top: 12px;
+
+            font-size: 14px;
+
+            color: #cbd5e1;
+        }
+
+        #errorText {
+
+            display: none;
+
+            margin-top: 15px;
+
+            padding: 12px;
+
+            border-radius: 8px;
+
+            background:
+                rgba(239,68,68,0.15);
+
+            color: #fca5a5;
+
+            font-size: 13px;
+
+            line-height: 1.5;
+        }
+
+
+        /* =====================================================
+           COORDINATE PANEL
+        ====================================================== */
+
+        #coordinates {
+
+            position: fixed;
+
+            top: 15px;
+            left: 15px;
+
+            z-index: 50;
+
+            min-width: 215px;
+
+            padding: 14px 16px;
+
+            background:
+                rgba(2,6,23,0.78);
+
+            backdrop-filter:
+                blur(10px);
+
+            -webkit-backdrop-filter:
+                blur(10px);
+
+            border:
+                1px solid
+                rgba(255,255,255,0.15);
+
+            border-radius: 12px;
+
+            color: white;
+
+            font-family: monospace;
+
+            font-size: 13px;
+
+            box-shadow:
+                0 8px 30px
+                rgba(0,0,0,0.3);
+        }
+
+        .coordTitle {
+
+            font-family:
+                Arial,
+                Helvetica,
+                sans-serif;
+
+            font-weight: 700;
+
+            font-size: 13px;
+
+            color: #38bdf8;
+
+            margin-bottom: 7px;
+        }
+
+        .coordRow {
+
+            display: flex;
+
+            justify-content:
+                space-between;
+
+            gap: 15px;
+
+            margin: 3px 0;
+        }
+
+        .coordLabel {
+
+            color: #94a3b8;
+        }
+
+        .coordValue {
+
+            color: #f8fafc;
+
+            font-weight: 600;
+        }
+
+        .coordDivider {
+
+            height: 1px;
+
+            background:
+                rgba(255,255,255,0.12);
+
+            margin: 11px 0;
+        }
+
+
+        /* =====================================================
+           CROSSHAIR
+        ====================================================== */
+
+        #crosshair {
+
+            position: fixed;
+
+            left: 50%;
+            top: 50%;
+
+            width: 18px;
+            height: 18px;
+
+            transform:
+                translate(-50%, -50%);
+
+            z-index: 40;
+
+            pointer-events: none;
+        }
+
+        #crosshair::before,
+        #crosshair::after {
+
+            content: "";
+
+            position: absolute;
+
+            background:
+                rgba(255,255,255,0.9);
+        }
+
+        #crosshair::before {
+
+            width: 2px;
+            height: 18px;
+
+            left: 8px;
+            top: 0;
+        }
+
+        #crosshair::after {
+
+            width: 18px;
+            height: 2px;
+
+            left: 0;
+            top: 8px;
+        }
+
+
+        /* =====================================================
+           INSTRUCTIONS
+        ====================================================== */
+
+        #instructions {
+
+            position: fixed;
+
+            left: 50%;
+            bottom: 15px;
+
+            transform:
+                translateX(-50%);
+
+            z-index: 50;
+
+            padding:
+                9px 15px;
+
+            color: #e2e8f0;
+
+            background:
+                rgba(2,6,23,0.75);
+
+            border:
+                1px solid
+                rgba(255,255,255,0.12);
+
+            border-radius: 10px;
+
+            font-size: 12px;
+
+            text-align: center;
+
+            backdrop-filter:
+                blur(8px);
+
+            -webkit-backdrop-filter:
+                blur(8px);
+
+            pointer-events: none;
+        }
+
+        #instructions strong {
+
+            color: #38bdf8;
+        }
+
+
+        /* =====================================================
+           MOBILE CONTROL PANEL
+        ====================================================== */
+
+        #mobileControls {
+
+            position: fixed;
+
+            left: 0;
+            right: 0;
+            bottom: 55px;
+
+            z-index: 100;
+
+            display: none;
+
+            pointer-events: none;
+        }
+
+
+        /* =====================================================
+           DIRECTION PAD
+        ====================================================== */
+
+        #directionPad {
+
+            position: absolute;
+
+            left: 18px;
+            bottom: 0;
+
+            width: 170px;
+            height: 170px;
+
+            pointer-events: auto;
+        }
+
+        .moveButton {
+
+            position: absolute;
+
+            width: 55px;
+            height: 55px;
+
+            border-radius: 14px;
+
+            border:
+                1px solid
+                rgba(255,255,255,0.25);
+
+            background:
+                rgba(15,23,42,0.82);
+
+            color: white;
+
+            font-size: 25px;
+
+            font-weight: bold;
+
+            display: flex;
+
+            align-items: center;
+            justify-content: center;
+
+            user-select: none;
+
+            -webkit-user-select: none;
+
+            touch-action: none;
+
+            box-shadow:
+                0 5px 15px
+                rgba(0,0,0,0.3);
+
+            transition:
+                transform 0.05s,
+                background 0.05s;
+        }
+
+        .moveButton:active,
+        .moveButton.active {
+
+            transform: scale(0.90);
+
+            background:
+                rgba(37,99,235,0.95);
+        }
+
+        #btnForward {
+
+            left: 57px;
+            top: 0;
+        }
+
+        #btnLeft {
+
+            left: 0;
+            top: 57px;
+        }
+
+        #btnBackward {
+
+            left: 57px;
+            top: 57px;
+        }
+
+        #btnRight {
+
+            left: 114px;
+            top: 57px;
+        }
+
+        #btnUp {
+
+            left: 57px;
+            top: 114px;
+        }
+
+
+        /* =====================================================
+           VERTICAL + FAST BUTTONS
+        ====================================================== */
+
+        #extraControls {
+
+            position: absolute;
+
+            right: 18px;
+            bottom: 0;
+
+            display: flex;
+
+            flex-direction: column;
+
+            gap: 10px;
+
+            pointer-events: auto;
+        }
+
+        .extraButton {
+
+            width: 70px;
+            height: 55px;
+
+            border-radius: 14px;
+
+            border:
+                1px solid
+                rgba(255,255,255,0.25);
+
+            background:
+                rgba(15,23,42,0.82);
+
+            color: white;
+
+            font-size: 12px;
+
+            font-weight: bold;
+
+            display: flex;
+
+            align-items: center;
+            justify-content: center;
+
+            user-select: none;
+
+            -webkit-user-select: none;
+
+            touch-action: none;
+
+            box-shadow:
+                0 5px 15px
+                rgba(0,0,0,0.3);
+        }
+
+        .extraButton:active,
+        .extraButton.active {
+
+            background:
+                rgba(37,99,235,0.95);
+
+            transform:
+                scale(0.90);
+        }
+
+        #btnDown {
+
+            margin-top: 0;
+        }
+
+        #btnFast {
+
+            background:
+                rgba(245,158,11,0.82);
+        }
+
+        #btnFast.active {
+
+            background:
+                rgba(234,88,12,0.98);
+        }
+
+
+        /* =====================================================
+           MOBILE
+        ====================================================== */
+
+        @media (max-width: 900px) {
+
+            #mobileControls {
+
+                display: block;
+            }
+
+            #instructions {
+
+                bottom: 10px;
+
+                width:
+                    calc(100% - 20px);
+
+                font-size: 10px;
+
+                line-height: 1.5;
+            }
+
+            #coordinates {
+
+                top: 10px;
+                left: 10px;
+
+                min-width: 190px;
+
+                padding:
+                    10px 12px;
+
+                font-size: 11px;
+            }
+
+            .coordTitle {
+
+                font-size: 11px;
+            }
+        }
+
+
+        @media (max-width: 500px) {
+
+            #mobileControls {
+
+                bottom: 58px;
+            }
+
+            #directionPad {
+
+                left: 10px;
+
+                width: 155px;
+                height: 155px;
+            }
+
+            .moveButton {
+
+                width: 50px;
+                height: 50px;
+
+                font-size: 22px;
+            }
+
+            #btnForward {
+
+                left: 52px;
+                top: 0;
+            }
+
+            #btnLeft {
+
+                left: 0;
+                top: 52px;
+            }
+
+            #btnBackward {
+
+                left: 52px;
+                top: 52px;
+            }
+
+            #btnRight {
+
+                left: 104px;
+                top: 52px;
+            }
+
+            #btnUp {
+
+                left: 52px;
+                top: 104px;
+            }
+
+            #extraControls {
+
+                right: 10px;
+            }
+
+            .extraButton {
+
+                width: 65px;
+                height: 50px;
+            }
+        }
+
+    </style>
+</head>
+
+
+<body>
+
+    <!-- =========================================================
+         THREE.JS CONTAINER
+    ========================================================== -->
+
+    <div id="container"></div>
+
+
+    <!-- =========================================================
+         LOADING SCREEN
+    ========================================================== -->
+
+    <div id="loadingScreen">
+
+        <div id="loadingBox">
+
+            <div id="loadingTitle">
+                Loading 3D House
+            </div>
+
+            <div id="progressContainer">
+
+                <div id="progressBar"></div>
+
+            </div>
+
+            <div id="loadingText">
+                Loading model... 0%
+            </div>
+
+            <div id="errorText"></div>
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================================================
+         COORDINATES
+    ========================================================== -->
+
+    <div id="coordinates">
+
+        <div class="coordTitle">
+            CAMERA POSITION
+        </div>
+
+        <div class="coordRow">
+
+            <span class="coordLabel">
+                X:
+            </span>
+
+            <span
+                class="coordValue"
+                id="cameraX"
+            >
+                0.00
+            </span>
+
+        </div>
+
+        <div class="coordRow">
+
+            <span class="coordLabel">
+                Y:
+            </span>
+
+            <span
+                class="coordValue"
+                id="cameraY"
+            >
+                1.60
+            </span>
+
+        </div>
+
+        <div class="coordRow">
+
+            <span class="coordLabel">
+                Z:
+            </span>
+
+            <span
+                class="coordValue"
+                id="cameraZ"
+            >
+                0.00
+            </span>
+
+        </div>
+
+
+        <div class="coordDivider"></div>
+
+
+        <div class="coordTitle">
+            LOOK AT 3D POSITION
+        </div>
+
+        <div class="coordRow">
+
+            <span class="coordLabel">
+                X:
+            </span>
+
+            <span
+                class="coordValue"
+                id="mouseX"
+            >
+                ---
+            </span>
+
+        </div>
+
+        <div class="coordRow">
+
+            <span class="coordLabel">
+                Y:
+            </span>
+
+            <span
+                class="coordValue"
+                id="mouseY"
+            >
+                ---
+            </span>
+
+        </div>
+
+        <div class="coordRow">
+
+            <span class="coordLabel">
+                Z:
+            </span>
+
+            <span
+                class="coordValue"
+                id="mouseZ"
+            >
+                ---
+            </span>
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================================================
+         CROSSHAIR
+    ========================================================== -->
+
+    <div id="crosshair"></div>
+
+
+    <!-- =========================================================
+         MOBILE CONTROLS
+    ========================================================== -->
+
+    <div id="mobileControls">
+
+
+        <!-- =============================================
+             DIRECTION PAD
+        ============================================== -->
+
+        <div id="directionPad">
+
+            <div
+                class="moveButton"
+                id="btnForward"
+                data-action="forward"
+            >
+                ▲
+            </div>
+
+            <div
+                class="moveButton"
+                id="btnLeft"
+                data-action="left"
+            >
+                ◀
+            </div>
+
+            <div
+                class="moveButton"
+                id="btnBackward"
+                data-action="backward"
+            >
+                ▼
+            </div>
+
+            <div
+                class="moveButton"
+                id="btnRight"
+                data-action="right"
+            >
+                ▶
+            </div>
+
+            <div
+                class="moveButton"
+                id="btnUp"
+                data-action="up"
+            >
+                +
+            </div>
+
+        </div>
+
+
+        <!-- =============================================
+             EXTRA CONTROLS
+        ============================================== -->
+
+        <div id="extraControls">
+
+            <div
+                class="extraButton"
+                id="btnDown"
+                data-action="down"
+            >
+                DOWN
+            </div>
+
+            <div
+                class="extraButton"
+                id="btnFast"
+                data-action="fast"
+            >
+                FAST
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <!-- =========================================================
+         INSTRUCTIONS
+    ========================================================== -->
+
+    <div id="instructions">
+
+        <strong>PC:</strong>
+        WASD Move |
+        Q/E Up Down |
+        SHIFT Fast |
+        Mouse Drag Look
+
+        &nbsp;&nbsp;
+
+        <strong>Mobile:</strong>
+        Buttons Move |
+        Drag Screen Look
+
+    </div>
+
+
+    <!-- =========================================================
+         MAIN JAVASCRIPT
+    ========================================================== -->
+
+    <script type="module">
+
+        import * as THREE from "three";
+
+        import {
+            GLTFLoader
+        } from
+        "three/addons/loaders/GLTFLoader.js";
+
+
+        /* =====================================================
+           CONTAINER
+        ====================================================== */
+
+        const container =
+            document.getElementById(
+                "container"
+            );
+
+
+        /* =====================================================
+           SCENE
+        ====================================================== */
+
+        const scene =
+            new THREE.Scene();
+
+
+        scene.background =
+            new THREE.Color(
+                0x87ceeb
+            );
+
+
+        /* =====================================================
+           CAMERA
+        ====================================================== */
+
+        const camera =
+            new THREE.PerspectiveCamera(
+
+                75,
+
+                window.innerWidth /
+                window.innerHeight,
+
+                0.01,
+
+                5000
+
+            );
+
+
+        /*
+         * INITIAL CAMERA POSITION
+         *
+         * Change these values when
+         * you want a different starting
+         * position inside the house.
+         */
+
+        const INITIAL_CAMERA = {
+
+            x: 0,
+
+            y: 1.6,
+
+            z: 0
+
+        };
+
+
+        camera.position.set(
+
+            INITIAL_CAMERA.x,
+
+            INITIAL_CAMERA.y,
+
+            INITIAL_CAMERA.z
+
+        );
+
+
+        camera.rotation.order =
+            "YXZ";
+
+
+        /* =====================================================
+           RENDERER
+        ====================================================== */
+
+        const renderer =
+            new THREE.WebGLRenderer({
+
+                antialias: true,
+
+                powerPreference:
+                    "high-performance"
+
+            });
+
+
+        renderer.setSize(
+
+            window.innerWidth,
+
+            window.innerHeight
+
+        );
+
+
+        renderer.setPixelRatio(
+
+            Math.min(
+                window.devicePixelRatio,
+                2
+            )
+
+        );
+
+
+        renderer.outputColorSpace =
+            THREE.SRGBColorSpace;
+
+
+        renderer.shadowMap.enabled =
+            true;
+
+
+        renderer.shadowMap.type =
+            THREE.PCFSoftShadowMap;
+
+
+        container.appendChild(
+            renderer.domElement
+        );
+
+
+        /* =====================================================
+           LIGHTS
+        ====================================================== */
+
+        const hemisphereLight =
+            new THREE.HemisphereLight(
+
+                0xffffff,
+
+                0x444444,
+
+                1.8
+
+            );
+
+
+        scene.add(
+            hemisphereLight
+        );
+
+
+        const directionalLight =
+            new THREE.DirectionalLight(
+
+                0xffffff,
+
+                2.5
+
+            );
+
+
+        directionalLight.position.set(
+
+            20,
+
+            40,
+
+            20
+
+        );
+
+
+        directionalLight.castShadow =
+            true;
+
+
+        directionalLight.shadow.mapSize.width =
+            2048;
+
+
+        directionalLight.shadow.mapSize.height =
+            2048;
+
+
+        scene.add(
+            directionalLight
+        );
+
+
+        const pointLight =
+            new THREE.PointLight(
+
+                0xffffff,
+
+                1.5,
+
+                100
+
+            );
+
+
+        pointLight.position.set(
+
+            0,
+
+            5,
+
+            0
+
+        );
+
+
+        scene.add(
+            pointLight
+        );
+
+
+        /* =====================================================
+           MODEL
+        ====================================================== */
+
+        let model = null;
+
+
+        const loader =
+            new GLTFLoader();
+
+
+        const modelURL =
+            "{{ url_for('static', filename='house.glb') }}";
+
+
+        const loadingScreen =
+            document.getElementById(
+                "loadingScreen"
+            );
+
+
+        const progressBar =
+            document.getElementById(
+                "progressBar"
+            );
+
+
+        const loadingText =
+            document.getElementById(
+                "loadingText"
+            );
+
+
+        const errorText =
+            document.getElementById(
+                "errorText"
+            );
+
+
+        loader.load(
+
+            modelURL,
+
+            function (gltf) {
+
+                model =
+                    gltf.scene;
+
+
+                /*
+                 * IMPORTANT:
+                 *
+                 * The model is NOT centered.
+                 *
+                 * The model is NOT scaled.
+                 *
+                 * Original GLB coordinates
+                 * remain unchanged.
+                 */
+
+                scene.add(
+                    model
+                );
+
+
+                model.traverse(
+                    function (object) {
+
+                        if (
+                            object.isMesh
+                        ) {
+
+                            object.castShadow =
+                                true;
+
+                            object.receiveShadow =
+                                true;
+
+
+                            if (
+                                object.material
+                            ) {
+
+                                object.material.needsUpdate =
+                                    true;
+
+                            }
+
+                        }
+
+                    }
+                );
+
+
+                progressBar.style.width =
+                    "100%";
+
+
+                loadingText.innerText =
+                    "Model loaded successfully";
+
+
+                setTimeout(
+                    function () {
+
+                        loadingScreen.style.display =
+                            "none";
+
+                    },
+
+                    400
+                );
+
+
+                console.log(
+                    "house.glb loaded"
+                );
+
+            },
+
+            function (xhr) {
+
+                if (
+                    xhr.total > 0
+                ) {
+
+                    const percent =
+                        (
+                            xhr.loaded /
+                            xhr.total
+                        ) * 100;
+
+
+                    progressBar.style.width =
+                        percent + "%";
+
+
+                    loadingText.innerText =
+                        "Loading model... " +
+                        Math.round(percent) +
+                        "%";
+
+                }
+                else {
+
+                    loadingText.innerText =
+                        "Loading model...";
+
+                }
+
+            },
+
+            function (error) {
+
+                console.error(
+                    "house.glb loading error:",
+                    error
+                );
+
+
+                loadingText.innerText =
+                    "Failed to load model";
+
+
+                errorText.style.display =
+                    "block";
+
+
+                errorText.innerText =
+                    "Could not load house.glb. " +
+                    "Make sure the file is inside " +
+                    "static/house.glb";
+
+            }
+
+        );
+
+
+        /* =====================================================
+           LOOK SYSTEM
+        ====================================================== */
+
+        let yaw = 0;
+
+        let pitch = 0;
+
+
+        const LOOK_SPEED =
+            0.0025;
+
+
+        /* =====================================================
+           MOUSE LOOK
+        ====================================================== */
+
+        let isDragging =
+            false;
+
+
+        let previousX = 0;
+
+        let previousY = 0;
+
+
+        renderer.domElement.addEventListener(
+
+            "mousedown",
+
+            function (event) {
+
+                isDragging =
+                    true;
+
+
+                previousX =
+                    event.clientX;
+
+
+                previousY =
+                    event.clientY;
+
+            }
+
+        );
+
+
+        window.addEventListener(
+
+            "mouseup",
+
+            function () {
+
+                isDragging =
+                    false;
+
+            }
+
+        );
+
+
+        renderer.domElement.addEventListener(
+
+            "mousemove",
+
+            function (event) {
+
+                if (
+                    !isDragging
+                ) {
+                    return;
+                }
+
+
+                const deltaX =
+                    event.clientX -
+                    previousX;
+
+
+                const deltaY =
+                    event.clientY -
+                    previousY;
+
+
+                previousX =
+                    event.clientX;
+
+
+                previousY =
+                    event.clientY;
+
+
+                yaw -=
+                    deltaX *
+                    LOOK_SPEED;
+
+
+                pitch -=
+                    deltaY *
+                    LOOK_SPEED;
+
+
+                const maxPitch =
+                    Math.PI / 2 -
+                    0.05;
+
+
+                pitch =
+                    THREE.MathUtils.clamp(
+
+                        pitch,
+
+                        -maxPitch,
+
+                        maxPitch
+
+                    );
+
+
+                camera.rotation.y =
+                    yaw;
+
+
+                camera.rotation.x =
+                    pitch;
+
+            }
+
+        );
+
+
+        /* =====================================================
+           TOUCH LOOK
+        ====================================================== */
+
+        let touchActive =
+            false;
+
+
+        let previousTouchX = 0;
+
+        let previousTouchY = 0;
+
+
+        renderer.domElement.addEventListener(
+
+            "touchstart",
+
+            function (event) {
+
+                /*
+                 * Don't start look when
+                 * interacting with buttons.
+                 */
+
+                if (
+                    event.target.closest(
+                        ".moveButton"
+                    ) ||
+                    event.target.closest(
+                        ".extraButton"
+                    )
+                ) {
+
+                    return;
+
+                }
+
+
+                if (
+                    event.touches.length !== 1
+                ) {
+
+                    return;
+
+                }
+
+
+                touchActive =
+                    true;
+
+
+                previousTouchX =
+                    event.touches[0].clientX;
+
+
+                previousTouchY =
+                    event.touches[0].clientY;
+
+            },
+
+            {
+                passive: false
+            }
+
+        );
+
+
+        renderer.domElement.addEventListener(
+
+            "touchmove",
+
+            function (event) {
+
+                if (
+                    !touchActive
+                ) {
+
+                    return;
+
+                }
+
+
+                if (
+                    event.touches.length !== 1
+                ) {
+
+                    return;
+
+                }
+
+
+                event.preventDefault();
+
+
+                const currentX =
+                    event.touches[0].clientX;
+
+
+                const currentY =
+                    event.touches[0].clientY;
+
+
+                const deltaX =
+                    currentX -
+                    previousTouchX;
+
+
+                const deltaY =
+                    currentY -
+                    previousTouchY;
+
+
+                previousTouchX =
+                    currentX;
+
+
+                previousTouchY =
+                    currentY;
+
+
+                yaw -=
+                    deltaX *
+                    LOOK_SPEED;
+
+
+                pitch -=
+                    deltaY *
+                    LOOK_SPEED;
+
+
+                const maxPitch =
+                    Math.PI / 2 -
+                    0.05;
+
+
+                pitch =
+                    THREE.MathUtils.clamp(
+
+                        pitch,
+
+                        -maxPitch,
+
+                        maxPitch
+
+                    );
+
+
+                camera.rotation.y =
+                    yaw;
+
+
+                camera.rotation.x =
+                    pitch;
+
+            },
+
+            {
+                passive: false
+            }
+
+        );
+
+
+        renderer.domElement.addEventListener(
+
+            "touchend",
+
+            function () {
+
+                touchActive =
+                    false;
+
+            }
+
+        );
+
+
+        renderer.domElement.addEventListener(
+
+            "touchcancel",
+
+            function () {
+
+                touchActive =
+                    false;
+
+            }
+
+        );
+
+
+        /* =====================================================
+           MOVEMENT STATE
+        ====================================================== */
+
+        const keys = {
+
+            forward: false,
+
+            backward: false,
+
+            left: false,
+
+            right: false,
+
+            up: false,
+
+            down: false,
+
+            shift: false
+
+        };
+
+
+        /*
+         * Normal speed
+         */
+
+        const normalSpeed =
+            5;
+
+
+        /*
+         * Fast speed
+         */
+
+        const fastSpeed =
+            25;
+
+
+        /* =====================================================
+           KEYBOARD CONTROLS
+        ====================================================== */
+
+        document.addEventListener(
+
+            "keydown",
+
+            function (event) {
+
+                switch (
+                    event.code
+                ) {
+
+                    case "KeyW":
+
+                        keys.forward =
+                            true;
+
+                        event.preventDefault();
+
+                        break;
+
+
+                    case "KeyS":
+
+                        keys.backward =
+                            true;
+
+                        event.preventDefault();
+
+                        break;
+
+
+                    case "KeyA":
+
+                        keys.left =
+                            true;
+
+                        event.preventDefault();
+
+                        break;
+
+
+                    case "KeyD":
+
+                        keys.right =
+                            true;
+
+                        event.preventDefault();
+
+                        break;
+
+
+                    case "KeyQ":
+
+                        keys.down =
+                            true;
+
+                        event.preventDefault();
+
+                        break;
+
+
+                    case "KeyE":
+
+                        keys.up =
+                            true;
+
+                        event.preventDefault();
+
+                        break;
+
+
+                    case "ShiftLeft":
+
+                    case "ShiftRight":
+
+                        keys.shift =
+                            true;
+
+                        event.preventDefault();
+
+                        break;
+
+                }
+
+            }
+
+        );
+
+
+        document.addEventListener(
+
+            "keyup",
+
+            function (event) {
+
+                switch (
+                    event.code
+                ) {
+
+                    case "KeyW":
+
+                        keys.forward =
+                            false;
+
+                        break;
+
+
+                    case "KeyS":
+
+                        keys.backward =
+                            false;
+
+                        break;
+
+
+                    case "KeyA":
+
+                        keys.left =
+                            false;
+
+                        break;
+
+
+                    case "KeyD":
+
+                        keys.right =
+                            false;
+
+                        break;
+
+
+                    case "KeyQ":
+
+                        keys.down =
+                            false;
+
+                        break;
+
+
+                    case "KeyE":
+
+                        keys.up =
+                            false;
+
+                        break;
+
+
+                    case "ShiftLeft":
+
+                    case "ShiftRight":
+
+                        keys.shift =
+                            false;
+
+                        break;
+
+                }
+
+            }
+
+        );
+
+
+        /* =====================================================
+           MOBILE BUTTON HELPER
+        ====================================================== */
+
+        function bindHoldButton(
+            element,
+            action
+        ) {
+
+            if (!element) {
+                return;
+            }
+
+
+            function start(event) {
+
+                event.preventDefault();
+
+                event.stopPropagation();
+
+
+                keys[action] =
+                    true;
+
+
+                element.classList.add(
+                    "active"
+                );
+
+            }
+
+
+            function stop(event) {
+
+                event.preventDefault();
+
+                event.stopPropagation();
+
+
+                keys[action] =
+                    false;
+
+
+                element.classList.remove(
+                    "active"
+                );
+
+            }
+
+
+            /*
+             * Touch
+             */
+
+            element.addEventListener(
+
+                "touchstart",
+
+                start,
+
+                {
+                    passive: false
+                }
+
+            );
+
+
+            element.addEventListener(
+
+                "touchend",
+
+                stop,
+
+                {
+                    passive: false
+                }
+
+            );
+
+
+            element.addEventListener(
+
+                "touchcancel",
+
+                stop,
+
+                {
+                    passive: false
+                }
+
+            );
+
+
+            /*
+             * Mouse
+             */
+
+            element.addEventListener(
+
+                "mousedown",
+
+                start
+
+            );
+
+
+            element.addEventListener(
+
+                "mouseup",
+
+                stop
+
+            );
+
+
+            element.addEventListener(
+
+                "mouseleave",
+
+                stop
+
+            );
+
+        }
+
+
+        /* =====================================================
+           MOBILE MOVEMENT BUTTONS
+        ====================================================== */
+
+        bindHoldButton(
+
+            document.getElementById(
+                "btnForward"
+            ),
+
+            "forward"
+
+        );
+
+
+        bindHoldButton(
+
+            document.getElementById(
+                "btnBackward"
+            ),
+
+            "backward"
+
+        );
+
+
+        bindHoldButton(
+
+            document.getElementById(
+                "btnLeft"
+            ),
+
+            "left"
+
+        );
+
+
+        bindHoldButton(
+
+            document.getElementById(
+                "btnRight"
+            ),
+
+            "right"
+
+        );
+
+
+        bindHoldButton(
+
+            document.getElementById(
+                "btnUp"
+            ),
+
+            "up"
+
+        );
+
+
+        bindHoldButton(
+
+            document.getElementById(
+                "btnDown"
+            ),
+
+            "down"
+
+        );
+
+
+        bindHoldButton(
+
+            document.getElementById(
+                "btnFast"
+            ),
+
+            "shift"
+
+        );
+
+
+        /* =====================================================
+           MOVEMENT
+        ====================================================== */
+
+        const movement =
+            new THREE.Vector3();
+
+
+        const yawAxis =
+            new THREE.Vector3(
+                0,
+                1,
+                0
+            );
+
+
+        function updateMovement(
+            delta
+        ) {
+
+            let speed =
+                keys.shift
+                    ? fastSpeed
+                    : normalSpeed;
+
+
+            speed *= delta;
+
+
+            movement.set(
+                0,
+                0,
+                0
+            );
+
+
+            /*
+             * Forward/backward
+             */
+
+            if (
+                keys.forward
+            ) {
+
+                movement.z -= 1;
+
+            }
+
+
+            if (
+                keys.backward
+            ) {
+
+                movement.z += 1;
+
+            }
+
+
+            /*
+             * Left/right
+             */
+
+            if (
+                keys.left
+            ) {
+
+                movement.x -= 1;
+
+            }
+
+
+            if (
+                keys.right
+            ) {
+
+                movement.x += 1;
+
+            }
+
+
+            /*
+             * Horizontal movement
+             * follows camera yaw.
+             *
+             * Camera pitch does NOT affect
+             * WASD movement.
+             */
+
+            if (
+                movement.lengthSq() > 0
+            ) {
+
+                movement.normalize();
+
+
+                movement.applyAxisAngle(
+
+                    yawAxis,
+
+                    yaw
+
+                );
+
+
+                camera.position.x +=
+                    movement.x *
+                    speed;
+
+
+                camera.position.z +=
+                    movement.z *
+                    speed;
+
+            }
+
+
+            /*
+             * Vertical movement
+             */
+
+            if (
+                keys.up
+            ) {
+
+                camera.position.y +=
+                    speed;
+
+            }
+
+
+            if (
+                keys.down
+            ) {
+
+                camera.position.y -=
+                    speed;
+
+            }
+
+        }
+
+
+        /* =====================================================
+           CAMERA COORDINATES
+        ====================================================== */
+
+        const cameraX =
+            document.getElementById(
+                "cameraX"
+            );
+
+
+        const cameraY =
+            document.getElementById(
+                "cameraY"
+            );
+
+
+        const cameraZ =
+            document.getElementById(
+                "cameraZ"
+            );
+
+
+        function updateCameraCoordinates() {
+
+            cameraX.innerText =
+                camera.position.x.toFixed(
+                    2
+                );
+
+
+            cameraY.innerText =
+                camera.position.y.toFixed(
+                    2
+                );
+
+
+            cameraZ.innerText =
+                camera.position.z.toFixed(
+                    2
+                );
+
+        }
+
+
+        /* =====================================================
+           RAYCASTING
+        ====================================================== */
+
+        const raycaster =
+            new THREE.Raycaster();
+
+
+        const mouseX =
+            document.getElementById(
+                "mouseX"
+            );
+
+
+        const mouseY =
+            document.getElementById(
+                "mouseY"
+            );
+
+
+        const mouseZ =
+            document.getElementById(
+                "mouseZ"
+            );
+
+
+        function updateLookCoordinates() {
+
+            if (!model) {
+
+                return;
+
+            }
+
+
+            /*
+             * Ray starts from the center
+             * crosshair.
+             */
+
+            raycaster.setFromCamera(
+
+                new THREE.Vector2(
+                    0,
+                    0
+                ),
+
+                camera
+
+            );
+
+
+            const intersections =
+                raycaster.intersectObject(
+
+                    model,
+
+                    true
+
+                );
+
+
+            if (
+                intersections.length > 0
+            ) {
+
+                const point =
+                    intersections[0].point;
+
+
+                mouseX.innerText =
+                    point.x.toFixed(
+                        2
+                    );
+
+
+                mouseY.innerText =
+                    point.y.toFixed(
+                        2
+                    );
+
+
+                mouseZ.innerText =
+                    point.z.toFixed(
+                        2
+                    );
+
+            }
+            else {
+
+                mouseX.innerText =
+                    "---";
+
+
+                mouseY.innerText =
+                    "---";
+
+
+                mouseZ.innerText =
+                    "---";
+
+            }
+
+        }
+
+
+        /* =====================================================
+           RESIZE
+        ====================================================== */
+
+        window.addEventListener(
+
+            "resize",
+
+            function () {
+
+                camera.aspect =
+
+                    window.innerWidth /
+                    window.innerHeight;
+
+
+                camera.updateProjectionMatrix();
+
+
+                renderer.setSize(
+
+                    window.innerWidth,
+
+                    window.innerHeight
+
+                );
+
+            }
+
+        );
+
+
+        /* =====================================================
+           ANIMATION
+        ====================================================== */
+
+        const clock =
+            new THREE.Clock();
+
+
+        function animate() {
+
+            requestAnimationFrame(
+                animate
+            );
+
+
+            const delta =
+                Math.min(
+
+                    clock.getDelta(),
+
+                    0.05
+
+                );
+
+
+            updateMovement(
+                delta
+            );
+
+
+            updateCameraCoordinates();
+
+
+            updateLookCoordinates();
+
+
+            renderer.render(
+
+                scene,
+
+                camera
+
+            );
+
+        }
+
+
+        /* =====================================================
+           START
+        ====================================================== */
+
+        updateCameraCoordinates();
+
+        animate();
+
+    </script>
+
+</body>
+</html>
